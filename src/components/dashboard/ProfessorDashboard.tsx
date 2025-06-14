@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef  } from 'react';
-import { Users, MessageCircle, BookOpen, Activity, Plus, Mail, Clock, Eye, X } from 'lucide-react';
+import { Users, MessageCircle, BookOpen, Activity, Plus, Mail, Clock, Eye, X, Video } from 'lucide-react';
 import axios from 'axios';
+import MeetingManager from './MeetingManager';
 
 interface User {
   id: number;
@@ -169,6 +170,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
     { id: 'students', label: 'Étudiants', icon: Users },
     { id: 'activities', label: 'Activités', icon: Clock },
     { id: 'messages', label: 'Messages', icon: MessageCircle },
+    { id: 'meetings', label: 'Réunions', icon: Video },
     { id: 'add-student', label: 'Ajouter Étudiant', icon: Plus }
   ];
 
@@ -495,6 +497,11 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Meetings Tab */}
+          {activeTab === 'meetings' && (
+            <MeetingManager students={students} />
           )}
 
           {/* Add Student Tab */}

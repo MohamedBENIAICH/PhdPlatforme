@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef  } from 'react';
-import { Clock, MessageCircle, BookOpen, PlusCircle, Eye, Calendar } from 'lucide-react';
+import { Clock, MessageCircle, BookOpen, PlusCircle, Eye, Calendar, Video } from 'lucide-react';
 import axios from 'axios';
+import StudentMeetingsTab from './StudentMeetingsTab';
 
 interface User {
   id: number;
@@ -245,6 +246,7 @@ const handleMarkAsRead = async () => {
     { id: 'overview', label: 'Aperçu', icon: Calendar },
     { id: 'articles', label: 'Articles', icon: BookOpen },
     { id: 'messages', label: 'Messages', icon: MessageCircle },
+    { id: 'meetings', label: 'Réunions', icon: Video },
     { id: 'add-article', label: 'Ajouter Article', icon: PlusCircle }
   ];
 
@@ -477,6 +479,11 @@ const handleMarkAsRead = async () => {
                 </button>
               </form>
             </div>
+          )}
+
+          {/* Meetings Tab */}
+          {activeTab === 'meetings' && (
+            <StudentMeetingsTab userId={user.id} />
           )}
 
           {/* Add Article Tab */}
