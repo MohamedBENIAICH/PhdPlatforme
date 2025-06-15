@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -10,9 +12,9 @@ const app = express();
 const PORT = process.env.PORT || 3009;
 
 // Zoom API Credentials (Server-to-Server OAuth)
-const ZOOM_CLIENT_ID = process.env.ZOOM_CLIENT_ID || "client_id"; // Remplacez par votre Client ID
-const ZOOM_CLIENT_SECRET = process.env.ZOOM_CLIENT_SECRET || "client_secret"; // Remplacez par votre Client Secret
-const ZOOM_ACCOUNT_ID = process.env.ZOOM_ACCOUNT_ID || "account_id"; // Remplacez par votre Account ID
+const ZOOM_CLIENT_ID = process.env.ZOOM_CLIENT_ID;
+const ZOOM_CLIENT_SECRET = process.env.ZOOM_CLIENT_SECRET;
+const ZOOM_ACCOUNT_ID = process.env.ZOOM_ACCOUNT_ID;
 
 let zoomAccessToken = null;
 let zoomTokenExpiry = 0;
@@ -52,10 +54,10 @@ const getZoomAccessToken = async () => {
 
 // MySQL connection pool
 const pool = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "", // No password as you specified
-  database: "PhdPlatforme",
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -66,14 +68,14 @@ app.use(cors());
 app.use(express.json());
 
 // JWT Secret (for internal app authentication)
-const JWT_SECRET = "your-secret-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Email configuration (for development, use ethereal or similar)
 const emailTransporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "email@gmail.com",
-    pass: "password",
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
@@ -120,7 +122,7 @@ const sendPasswordEmail = async (email, password, firstName) => {
         <p><strong>Votre mot de passe temporaire:</strong> ${password}</p>
         <p>Vous devrez changer ce mot de passe lors de votre première connexion.</p>
         <p>Connectez-vous sur la plateforme avec votre email et ce mot de passe.</p>
-        <p>Cordialement,<br>Prof. Abdelghani BELAKOUIRI</p>
+        <p>Cordialement,<br>Prof BELAKOUIRI Abdelghani</p>
       `,
     };
 
@@ -361,56 +363,27 @@ app.get("/api/messages", authenticateToken, async (req, res) => {
 // POST /api/messages
 app.post("/api/messages", authenticateToken, async (req, res) => {
   try {
-    const { recipientId, content, role } = req.body;
-    const [users] = await pool.query("SELECT * FROM users WHERE id = ?", [
-      req.user.id,
-    ]);
-    const user = users[0];
+    const { content, recipientId } = req.body;
+    const senderId = req.user.id;
+    const senderEmail = req.user.email;
+    const senderRole = req.user.role;
 
-    if (!recipientId || !content) {
-      return res
-        .status(400)
-        .json({ message: "recipientId and content are required" });
-    }
-
-    // Save message
-    const [result] = await pool.query(
-      "INSERT INTO messages (content, senderId, recipientId, sender, senderRole, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-      [
-        content,
-        user.id,
-        recipientId,
-        user.email,
-        user.role,
-        new Date().toISOString(),
-      ]
-    );
-
-    const newMessage = {
-      id: result.insertId,
-      content,
-      senderId: user.id,
-      recipientId,
-      sender: user.email,
-      senderRole: user.role,
-      timestamp: new Date().toISOString(),
-    };
-
-    // Track activity
     await pool.query(
-      "INSERT INTO activities (studentName, action, timestamp, userId) VALUES (?, ?, ?, ?)",
+      "INSERT INTO messages (senderId, recipientId, content, senderEmail, senderRole, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
       [
-        `${user.firstName} ${user.lastName}`,
-        "message",
+        senderId,
+        recipientId,
+        content,
+        senderEmail,
+        senderRole,
         new Date().toISOString(),
-        user.id,
       ]
     );
 
-    res.status(201).json(newMessage);
+    res.status(201).json({ message: "Message envoyé" });
   } catch (error) {
-    console.error("Send message error:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error sending message:", error);
+    res.status(500).json({ message: "Erreur lors de l'envoi du message" });
   }
 });
 

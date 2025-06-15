@@ -203,22 +203,6 @@ const handleMarkAsRead = async () => {
     };
   }, [dialogOpen, readingStartTime]);
 
-  const handleFinishReading = async (articleId: number) => {
-    if (readingStartTime) {
-      const readingTime = Math.floor((Date.now() - readingStartTime.getTime()) / 1000);
-      try {
-        await axios.post('/api/activity/reading', {
-          articleId,
-          readingTime
-        });
-        fetchStudentStats(); // Refresh stats after reading
-      } catch (error) {
-        console.error('Error tracking reading time:', error);
-      }
-      setReadingStartTime(null);
-    }
-  };
-
   const handleSubmitArticle = async (e: React.FormEvent) => {
     e.preventDefault();
     try {

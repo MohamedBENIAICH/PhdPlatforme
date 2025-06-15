@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef  } from 'react';
-import { Users, MessageCircle, BookOpen, Activity, Plus, Mail, Clock, Eye, X, Video } from 'lucide-react';
+import { Users, MessageCircle, BookOpen, Activity, Plus, Mail, Clock, X, Video } from 'lucide-react';
 import axios from 'axios';
 import MeetingManager from './MeetingManager';
 

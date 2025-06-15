@@ -116,7 +116,7 @@ const Login: React.FC = () => {
 
         <div className="text-center mt-6">
           <p className="text-xs text-gray-400">
-            © 2024 Plateforme Éducative. Tous droits réservés.
+            © 2025 Plateforme Éducative. Tous droits réservés.
           </p>
         </div>
       </div>
