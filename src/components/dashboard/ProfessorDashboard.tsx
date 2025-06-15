@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef  } from 'react';
-import { Users, MessageCircle, BookOpen, Activity, Plus, Mail, Clock, X, Video } from 'lucide-react';
+import { Users, MessageCircle, BookOpen, Activity, Plus, Mail, Clock, X, Video,File } from 'lucide-react';
 import axios from 'axios';
 import MeetingManager from './MeetingManager';
 
@@ -41,6 +41,15 @@ interface ProfessorDashboardProps {
   user: User;
 }
 
+interface Document {
+  id: number;
+  filename: string;
+  filepath: string;
+  uploader: string;
+  created_at: Date;
+}
+
+
 const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [students, setStudents] = useState<Student[]>([]);
@@ -51,7 +60,52 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+
   
+
+  const handleUpload = async () => {
+    if (!file) return alert("Choisir un fichier.");
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      await axios.post("/api/documents/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      alert("Upload réussi !");
+      setFile(null);
+      fetchDocuments();
+    } catch (err) {
+      console.error("Erreur upload :", err);
+      alert("Erreur lors de l'upload.");
+    }
+  };
+
+
+  const fetchDocuments = async () => {
+    const res = await axios.get("/api/documents");
+    setDocuments(res.data);
+  };
+
+  const handleDelete = async (id: number) => {
+  if (!window.confirm("Confirmer la suppression ?")) return;
+  try {
+    await axios.delete(`/api/documents/delete/${id}`);
+    alert("Document supprimé.");
+    fetchDocuments();
+  } catch (err) {
+    console.error(err);
+    alert("Erreur lors de la suppression.");
+  }
+};
+
+  const backendURL = "http://localhost:3009";
+
+
+  useEffect(() => { 
+    if (activeTab === 'documents') fetchDocuments(); 
+  }, [activeTab]);
 
   // Polling for students and activities (auto-refresh)
   useEffect(() => {
@@ -171,8 +225,9 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
     { id: 'activities', label: 'Activités', icon: Clock },
     { id: 'messages', label: 'Messages', icon: MessageCircle },
     { id: 'meetings', label: 'Réunions', icon: Video },
-    { id: 'add-student', label: 'Ajouter Étudiant', icon: Plus }
-  ];
+    { id: 'add-student', label: 'Ajouter Étudiant', icon: Plus },
+    { id: 'documents', label: 'Documents', icon: File } // Pick an icon
+  ]
 
   const handleDeleteStudent = async (studentId: number) => {
     if (!window.confirm("Voulez-vous vraiment supprimer cet étudiant ?")) return;
@@ -185,6 +240,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
     }
   };
 
+  
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
@@ -565,6 +621,58 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
                   Ajouter l'Étudiant
                 </button>
               </form>
+            </div>
+          )}
+
+
+          {/* Add documents tab */}
+          {activeTab === 'documents' && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Uploader un Document</h3>
+              <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <button onClick={handleUpload} className="bg-indigo-600 text-white px-4 py-2 rounded">Uploader</button>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold"> Liste des Documents</h3>
+                <div className="overflow-x-auto rounded-xl shadow border border-gray-200">
+                  <table className="min-w-full text-sm text-left">
+                    <thead className="bg-indigo-600 text-white">
+                      <tr>
+                        <th className="px-6 py-3 font-semibold">Nom du fichier</th>
+                        <th className="px-6 py-3 font-semibold">Téléversé par</th>
+                        <th className="px-6 py-3 font-semibold">Date</th>
+                        <th className="px-6 py-3 font-semibold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {documents.map(doc => (
+                        <tr key={doc.id} className="hover:bg-indigo-50 transition">
+                          <td className="px-6 py-4">{doc.filename}</td>
+                          <td className="px-6 py-4">{doc.uploader}</td>
+                          <td className="px-6 py-4">{new Date(doc.created_at).toLocaleDateString()}</td>
+                          <td className="px-6 py-4 space-x-2">
+                            <a
+                              href={`${backendURL}${doc.filepath}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+                            >
+                              Télécharger
+                            </a>
+                            <button
+                              onClick={() => handleDelete(doc.id)}
+                              className="inline-block px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                            >
+                              Supprimer
+                            </button>
+                          </td>
+
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
         </div>

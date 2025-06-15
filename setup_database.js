@@ -4,7 +4,7 @@ async function setupDatabase() {
   const connection = await mysql.createConnection({
     host: "localhost",
     user: "root",
-    password: "", // No password as specified
+    password: "", 
     database: "PhdPlatforme",
   });
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef  } from 'react';
-import { Clock, MessageCircle, BookOpen, PlusCircle, Eye, Calendar, Video } from 'lucide-react';
+import { Clock, MessageCircle, BookOpen, PlusCircle, Eye, Calendar, Video, File } from 'lucide-react';
 import axios from 'axios';
 import StudentMeetingsTab from './StudentMeetingsTab';
 
@@ -32,6 +32,15 @@ interface StudentDashboardProps {
   user: User;
 }
 
+interface Document {
+  id: number;
+  filename: string;
+  filepath: string;
+  uploader: string;
+  created_at: Date;
+}
+
+
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [articles, setArticles] = useState<Article[]>([]);
@@ -43,6 +52,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user }) => {
   const [totalReadingTime, setTotalReadingTime] = useState(0); // seconds
   const [activities, setActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [documents, setDocuments] = useState<Document[]>([]);
+
+  
+
 
   // Fetch recent activities for the student
   const fetchActivities = async () => {
@@ -226,12 +239,22 @@ const handleMarkAsRead = async () => {
     }
   };
 
+  const fetchDocuments = async () => {
+    const res = await axios.get("/api/documents");
+    setDocuments(res.data);
+  };
+
+  useEffect(() => { 
+    if (activeTab === 'documents') fetchDocuments(); 
+  }, [activeTab]);
+
   const tabs = [
     { id: 'overview', label: 'Aperçu', icon: Calendar },
     { id: 'articles', label: 'Articles', icon: BookOpen },
     { id: 'messages', label: 'Messages', icon: MessageCircle },
     { id: 'meetings', label: 'Réunions', icon: Video },
-    { id: 'add-article', label: 'Ajouter Article', icon: PlusCircle }
+    { id: 'add-article', label: 'Ajouter Article', icon: PlusCircle },
+    { id: 'documents', label: 'Documents', icon: File }
   ];
 
   return (
@@ -513,6 +536,44 @@ const handleMarkAsRead = async () => {
               </form>
             </div>
           )}
+
+          {activeTab === 'documents' && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Liste des Documents</h3>
+              <div className="overflow-x-auto rounded-xl shadow border border-gray-200">
+                <table className="min-w-full text-sm text-left">
+                  <thead className="bg-indigo-600 text-white">
+                    <tr>
+                      <th className="px-6 py-3 font-semibold">Nom du fichier</th>
+                      <th className="px-6 py-3 font-semibold">Téléversé par</th>
+                      <th className="px-6 py-3 font-semibold">Date</th>
+                      <th className="px-6 py-3 font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {documents.map(doc => (
+                      <tr key={doc.id} className="hover:bg-indigo-50 transition">
+                        <td className="px-6 py-4">{doc.filename}</td>
+                        <td className="px-6 py-4">{doc.uploader}</td>
+                        <td className="px-6 py-4">{new Date(doc.created_at).toLocaleDateString()}</td>
+                        <td className="px-6 py-4">
+                          <a
+                            href={`http://localhost:3009${doc.filepath}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+                          >
+                            Télécharger
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

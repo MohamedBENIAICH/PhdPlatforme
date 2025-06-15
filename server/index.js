@@ -7,6 +7,9 @@ const jwt = require("jsonwebtoken");
 const mysql = require("mysql2/promise");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
 const PORT = process.env.PORT || 3009;
@@ -822,6 +825,81 @@ app.get("/api/student/reading-times", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 });
+
+
+
+// Set up uploads directory
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+// Multer config
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+});
+const upload = multer({ storage });
+
+// Professor uploads a document
+app.post("/api/documents/upload", authenticateToken, upload.single("file"), async (req, res) => {
+  if (req.user.role !== "professor") {
+    return res.status(403).json({ message: "Only professors can upload documents." });
+  }
+  try {
+    const filepath = `/uploads/${req.file.filename}`;
+    await pool.query(
+      "INSERT INTO documents (filename, filepath, uploaded_by) VALUES (?, ?, ?)",
+      [req.file.originalname, filepath, req.user.id]
+    );
+    res.status(201).json({ message: "Document uploaded.", filepath });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ message: "Upload failed." });
+  }
+});
+
+
+// Get all documents (professor + students)
+app.get("/api/documents", authenticateToken, async (req, res) => {
+  try {
+    const [docs] = await pool.query(
+      `SELECT documents.*, CONCAT(users.firstName, ' ', users.lastName) as uploader 
+       FROM documents 
+       JOIN users ON users.id = documents.uploaded_by 
+       ORDER BY created_at DESC`
+    );
+    res.json(docs);
+  } catch (error) {
+    console.error("Fetch docs error:", error);
+    res.status(500).json({ message: "Server error fetching documents." });
+  }
+});
+
+// Serve uploaded files statically
+app.use("/uploads", express.static(uploadDir));
+
+// Delete a document (professor only)
+app.delete("/api/documents/delete/:id", authenticateToken, async (req, res) => {
+  if (req.user.role !== "professor") return res.sendStatus(403);
+
+  try {
+    const [[doc]] = await pool.query(
+      "SELECT filepath FROM documents WHERE id = ?", 
+      [req.params.id]
+    );
+    if (!doc) return res.sendStatus(404);
+
+    fs.unlink(path.join(__dirname, doc.filepath), () => {});
+    await pool.query("DELETE FROM documents WHERE id = ?", [req.params.id]);
+
+    res.json({ message: "Deleted." });
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
