@@ -245,6 +245,16 @@ const handleMarkAsRead = async () => {
     setDocuments(res.data);
   };
 
+  const handleDownload = async (doc: Document) => {
+    try {
+      await axios.post(`/api/documents/download/${doc.id}`);
+      window.open(`http://localhost:3009${doc.filepath}`, "_blank");
+    } catch (err) {
+      console.error("Error logging download:", err);
+      alert("Erreur lors du téléchargement.");
+    }
+  };
+
   useEffect(() => { 
     if (activeTab === 'documents') fetchDocuments(); 
   }, [activeTab]);
@@ -566,14 +576,12 @@ const handleMarkAsRead = async () => {
                         <td className="px-6 py-4">{doc.uploader}</td>
                         <td className="px-6 py-4">{new Date(doc.created_at).toLocaleDateString()}</td>
                         <td className="px-6 py-4">
-                          <a
-                            href={`http://localhost:3009${doc.filepath}`}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            onClick={() => handleDownload(doc)}
                             className="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
                           >
                             Télécharger
-                          </a>
+                          </button>
                         </td>
                       </tr>
                     ))}

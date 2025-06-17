@@ -51,6 +51,14 @@ interface Document {
   created_at: Date;
 }
 
+interface DownloadLog {
+  id: number;
+  filename: string;
+  firstName: string;
+  lastName: string;
+  downloaded_at: Date;
+}
+
 
 const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -64,6 +72,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [downloadLogs, setDownloadLogs] = useState<DownloadLog[]>([]);
 
   
 
@@ -90,6 +99,11 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
     setDocuments(res.data);
   };
 
+  const fetchDownloadLogs = async () => {
+    const res = await axios.get("/api/documents/downloads");
+    setDownloadLogs(res.data);
+  };
+
   const handleDelete = async (id: number) => {
   if (!window.confirm("Confirmer la suppression ?")) return;
   try {
@@ -105,8 +119,11 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
   const backendURL = "http://localhost:3009";
 
 
-  useEffect(() => { 
-    if (activeTab === 'documents') fetchDocuments(); 
+  useEffect(() => {
+    if (activeTab === 'documents') {
+      fetchDocuments();
+      fetchDownloadLogs();
+    }
   }, [activeTab]);
 
   // Polling for students and activities (auto-refresh)
@@ -683,6 +700,30 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+                
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold mb-4">Historique des téléchargements</h3>
+                  <div className="overflow-x-auto rounded-xl shadow border border-gray-200">
+                    <table className="min-w-full text-sm text-left">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-6 py-3 font-semibold">Étudiant</th>
+                          <th className="px-6 py-3 font-semibold">Document</th>
+                          <th className="px-6 py-3 font-semibold">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {downloadLogs.map(log => (
+                          <tr key={log.id}>
+                            <td className="px-6 py-4">{log.firstName} {log.lastName}</td>
+                            <td className="px-6 py-4">{log.filename}</td>
+                            <td className="px-6 py-4">{new Date(log.downloaded_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

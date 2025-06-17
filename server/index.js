@@ -1136,6 +1136,48 @@ const createTables = async () => {
   }
 };
 
+app.post("/api/documents/download/:id", authenticateToken, async (req, res) => {
+  const documentId = req.params.id;
+
+  if (req.user.role !== "student") {
+    return res.status(403).json({ message: "Only students can log downloads." });
+  }
+
+  try {
+    await pool.query(
+      "INSERT INTO document_downloads (document_id, student_id) VALUES (?, ?)",
+      [documentId, req.user.id]
+    );
+    res.status(201).json({ message: "Download logged." });
+  } catch (err) {
+    console.error("Logging download failed:", err);
+    res.status(500).json({ message: "Could not log download." });
+  }
+});
+
+
+app.get("/api/documents/downloads", authenticateToken, async (req, res) => {
+  if (req.user.role !== "professor") {
+    return res.sendStatus(403);
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT dd.id, dd.downloaded_at, d.filename, u.firstName, u.lastName
+      FROM document_downloads dd
+      JOIN documents d ON d.id = dd.document_id
+      JOIN users u ON u.id = dd.student_id
+      WHERE d.uploaded_by = ?
+      ORDER BY dd.downloaded_at DESC
+    `, [req.user.id]);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching download history:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Initialize database tables
 createTables().catch(console.error);
 
