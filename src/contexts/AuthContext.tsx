@@ -1,3 +1,4 @@
+/* contexts/AuthContext.tsx */
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
@@ -12,9 +13,10 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
   loading: boolean;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +54,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       localStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -61,10 +64,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await axios.post('/api/auth/login', { email, password });
       const { token, user } = response.data;
-      
+
       localStorage.setItem('token', token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);
+      return user;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Erreur de connexion');
     }
@@ -80,7 +84,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     login,
     logout,
-    loading
+    loading,
+    setUser,  // expose setter so other components can update user
   };
 
   return (

@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef  } from 'react';
-import { Users, MessageCircle, BookOpen, Activity, Plus, Mail, Clock, X, Video,File } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { Users, MessageCircle, BookOpen, Activity, Plus, Mail, Clock, X, Video, File, Eye } from 'lucide-react';
 import axios from 'axios';
 import MeetingManager from './MeetingManager';
 
@@ -441,9 +443,19 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user }) => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {Math.floor(student.totalReadingTime / 60)}h {student.totalReadingTime % 60}m
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                          <Link
+                            to={`/students/${student.id}`}
+                            className="text-indigo-600 hover:text-indigo-900 p-1"
+                            title="Voir le profil"
+                          >
+                            <Eye className="w-5 h-5" />
+                          </Link>
                           <button
-                            onClick={() => handleDeleteStudent(student.id)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteStudent(student.id);
+                            }}
                             className="text-red-600 hover:text-red-900 p-1"
                             title="Supprimer l'étudiant"
                           >

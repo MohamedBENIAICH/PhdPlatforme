@@ -56,6 +56,7 @@ const getZoomAccessToken = async () => {
 };
 
 // MySQL connection pool
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -365,28 +366,48 @@ app.get("/api/messages", authenticateToken, async (req, res) => {
 
 // POST /api/messages
 app.post("/api/messages", authenticateToken, async (req, res) => {
+  console.log('Received message request:', req.body); // Log incoming request
   try {
-    const { content, recipientId } = req.body;
+    const { content, recipientId, role } = req.body;
     const senderId = req.user.id;
     const senderEmail = req.user.email;
-    const senderRole = req.user.role;
+    // Use the role from the request if provided (for professor), otherwise use the user's role
+    const senderRole = role || req.user.role;
 
-    await pool.query(
-      "INSERT INTO messages (senderId, recipientId, content, senderEmail, senderRole, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+    console.log('Processing message:', { senderId, recipientId, content, senderEmail, senderRole });
+
+    if (!content || !recipientId) {
+      console.error('Missing required fields:', { content, recipientId });
+      return res.status(400).json({ 
+        message: "Content and recipientId are required",
+        received: { content: !!content, recipientId: !!recipientId }
+      });
+    }
+
+    const [result] = await pool.query(
+      "INSERT INTO messages (senderId, recipientId, content, sender, senderRole, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
       [
         senderId,
         recipientId,
         content,
-        senderEmail,
+        senderEmail, // This will be stored in the 'sender' column
         senderRole,
         new Date().toISOString(),
       ]
     );
 
-    res.status(201).json({ message: "Message envoyé" });
+    console.log('Message sent successfully:', result);
+    res.status(201).json({ 
+      message: "Message envoyé",
+      messageId: result.insertId 
+    });
   } catch (error) {
     console.error("Error sending message:", error);
-    res.status(500).json({ message: "Erreur lors de l'envoi du message" });
+    res.status(500).json({ 
+      message: "Erreur lors de l'envoi du message",
+      error: error.message,
+      code: error.code
+    });
   }
 });
 
@@ -590,19 +611,38 @@ app.post("/api/admin/students", authenticateToken, async (req, res) => {
 });
 
 // Delete student by ID
-app.delete("/api/admin/students/:id", async (req, res) => {
+app.delete("/api/admin/students/:id", authenticateToken, async (req, res) => {
+  if (req.user.role !== 'professor') {
+    return res.status(403).json({ message: 'Accès non autorisé' });
+  }
+
+  const connection = await pool.getConnection();
+  
   try {
     const studentId = req.params.id;
-    // Only allow deletion if user is a student
-    await pool.query('DELETE FROM users WHERE id = ? AND role = "student"', [
-      studentId,
-    ]);
+    
+    // Verify the user is a student
+    const [students] = await connection.query(
+      'SELECT * FROM users WHERE id = ? AND role = "student"',
+      [studentId]
+    );
+
+    if (students.length === 0) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+    
+    // Delete the student
+    await connection.query('DELETE FROM users WHERE id = ?', [studentId]);
+    
     res.json({ success: true });
   } catch (error) {
     console.error("Error deleting student:", error);
-    res
-      .status(500)
-      .json({ message: "Erreur lors de la suppression de l'étudiant." });
+    res.status(500).json({ 
+      message: "Erreur lors de la suppression de l'étudiant.",
+      error: error.message 
+    });
+  } finally {
+    connection.release();
   }
 });
 
@@ -841,6 +881,169 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Student Profile Endpoints
+
+// Get student by ID
+app.get('/api/students/:id', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, firstName, lastName, email, role FROM users WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+    // Add default values for any missing fields that the frontend might expect
+    const studentData = {
+      ...rows[0],
+      lastLogin: null,
+      totalReadingTime: 0,
+      articlesRead: 0
+    };
+    res.json({ success: true, data: studentData });
+  } catch (error) {
+    console.error('Error fetching student:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch student' });
+  }
+});
+
+// Get student's thesis
+app.get('/api/students/:id/thesis', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM theses WHERE user_id = ?', [req.params.id]);
+    if (rows.length === 0) {
+      return res.json({ success: true, data: null });
+    }
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Error fetching thesis:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch thesis' });
+  }
+});
+
+// Get student's objectives
+app.get('/api/students/:id/objectives', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM yearly_objectives WHERE thesis_id IN (SELECT id FROM theses WHERE user_id = ?) ORDER BY year_number',
+      [req.params.id]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching objectives:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch objectives' });
+  }
+});
+
+// Update objective status
+app.put('/api/objectives/:id', authenticateToken, async (req, res) => {
+  const { is_completed } = req.body;
+  try {
+    await pool.query('UPDATE yearly_objectives SET is_completed = ? WHERE id = ?', 
+      [is_completed, req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating objective:', error);
+    res.status(500).json({ success: false, error: 'Failed to update objective' });
+  }
+});
+
+// Thesis routes
+app.post('/api/theses', authenticateToken, async (req, res) => {
+  const { title, description } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const [result] = await pool.execute(
+      'INSERT INTO theses (title, description, user_id) VALUES (?, ?, ?)',
+      [title, description, userId]
+    );
+
+    res.status(201).json({
+      id: result.insertId,
+      title,
+      description,
+      message: 'Thèse créée avec succès'
+    });
+  } catch (error) {
+    console.error('Error creating thesis:', error);
+    res.status(500).json({ message: 'Erreur lors de la création de la thèse' });
+  }
+});
+
+app.get('/api/theses/me', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const [theses] = await pool.execute(
+      'SELECT * FROM theses WHERE user_id = ?',
+      [userId]
+    );
+
+    res.json(theses[0] || null);
+  } catch (error) {
+    console.error('Error fetching theses:', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des thèses' });
+  }
+});
+
+app.post('/api/theses/:thesisId/objectives', authenticateToken, async (req, res) => {
+  const { thesisId } = req.params;
+  const { yearNumber, objectives } = req.body;
+  const userId = req.user.id;
+
+  try {
+    // Verify thesis belongs to user
+    const [theses] = await pool.execute(
+      'SELECT * FROM theses WHERE id = ? AND user_id = ?',
+      [thesisId, userId]
+    );
+
+    if (theses.length === 0) {
+      return res.status(404).json({ message: 'Thèse non trouvée' });
+    }
+
+
+    // Insert or update objectives
+    await pool.execute(
+      `INSERT INTO yearly_objectives (thesis_id, year_number, objectives)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE objectives = ?`,
+      [thesisId, yearNumber, objectives, objectives]
+    );
+
+    res.json({ message: 'Objectifs enregistrés avec succès' });
+  } catch (error) {
+    console.error('Error saving objectives:', error);
+    res.status(500).json({ message: 'Erreur lors de la sauvegarde des objectifs' });
+  }
+});
+
+app.get('/api/theses/:thesisId/objectives', authenticateToken, async (req, res) => {
+  const { thesisId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    // Verify thesis belongs to user
+    const [theses] = await pool.execute(
+      'SELECT * FROM theses WHERE id = ? AND user_id = ?',
+      [thesisId, userId]
+    );
+
+    if (theses.length === 0) {
+      return res.status(404).json({ message: 'Thèse non trouvée' });
+    }
+
+    // Get all objectives for this thesis
+    const [objectives] = await pool.execute(
+      'SELECT * FROM yearly_objectives WHERE thesis_id = ? ORDER BY year_number',
+      [thesisId]
+    );
+
+    res.json(objectives);
+  } catch (error) {
+    console.error('Error fetching objectives:', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des objectifs' });
+  }
+});
+
 // Professor uploads a document
 app.post("/api/documents/upload", authenticateToken, upload.single("file"), async (req, res) => {
   if (req.user.role !== "professor") {
@@ -900,9 +1103,40 @@ app.delete("/api/documents/delete/:id", authenticateToken, async (req, res) => {
   }
 });
 
-
+// Start the server
 app.listen(PORT, () => {
+  console.log('Registered routes:');
+  app._router.stack.forEach((r) => {
+    if (r.route && r.route.path) {
+      Object.keys(r.route.methods).forEach((method) => {
+        console.log(`${method.toUpperCase()} ${r.route.path}`);
+      });
+    }
+  });
   console.log(`Server running on port ${PORT}`);
 });
+
+// Create messages table if it doesn't exist
+const createTables = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        senderId INT NOT NULL,
+        recipientId INT NOT NULL,
+        content TEXT NOT NULL,
+        senderRole ENUM('student', 'professor') NOT NULL,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sender VARCHAR(255) NOT NULL
+      )
+    `);
+    console.log('Messages table verified/created');
+  } catch (error) {
+    console.error('Error creating tables:', error);
+  }
+};
+
+// Initialize database tables
+createTables().catch(console.error);
 
 module.exports = app;

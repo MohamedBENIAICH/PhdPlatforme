@@ -4,7 +4,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import ChangePassword from './components/ChangePassword';
+import TheseAndGoals from './components/TheseAndGoals';
 import ProtectedRoute from './components/ProtectedRoute';
+import StudentProfile from './components/dashboard/StudentProfile';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -26,12 +28,33 @@ function AppContent() {
         path="/login" 
         element={user ? <Navigate to="/dashboard" /> : <Login />} 
       />
-      <Route path="/change-password" element={<ChangePassword />} />
+      <Route 
+        path="/change-password" 
+        element={
+            <ChangePassword />
+        } 
+      />
+      <Route 
+        path="/thesis-setup" 
+        element={
+          <ProtectedRoute>
+            <TheseAndGoals />
+          </ProtectedRoute>
+        } 
+      />
       <Route 
         path="/dashboard" 
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/students/:studentId" 
+        element={
+          <ProtectedRoute>
+            <StudentProfile />
           </ProtectedRoute>
         } 
       />

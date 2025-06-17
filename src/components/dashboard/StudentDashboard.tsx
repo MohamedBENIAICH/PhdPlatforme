@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef  } from 'react';
-import { Clock, MessageCircle, BookOpen, PlusCircle, Eye, Calendar, Video, File } from 'lucide-react';
+import { Clock, MessageCircle, BookOpen, PlusCircle, Eye, Calendar, Video, File, User } from 'lucide-react';
+import StudentProfile from './StudentProfile';
 import axios from 'axios';
 import StudentMeetingsTab from './StudentMeetingsTab';
 
-interface User {
+interface UserType {
   id: number;
   email: string;
   firstName: string;
@@ -29,7 +30,7 @@ interface Message {
 }
 
 interface StudentDashboardProps {
-  user: User;
+  user: UserType;
 }
 
 interface Document {
@@ -254,7 +255,8 @@ const handleMarkAsRead = async () => {
     { id: 'messages', label: 'Messages', icon: MessageCircle },
     { id: 'meetings', label: 'Réunions', icon: Video },
     { id: 'add-article', label: 'Ajouter Article', icon: PlusCircle },
-    { id: 'documents', label: 'Documents', icon: File }
+    { id: 'documents', label: 'Documents', icon: File },
+    { id: 'profile', label: 'Profil', icon: User }
   ];
 
   return (
@@ -534,6 +536,13 @@ const handleMarkAsRead = async () => {
                   Publier l'Article
                 </button>
               </form>
+            </div>
+          )}
+
+          {activeTab === 'profile' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900">Mon Profil</h2>
+              <StudentProfile studentId={user.id} />
             </div>
           )}
 
